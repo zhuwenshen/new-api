@@ -126,3 +126,61 @@ func GetAllQuotaDates(startTime int64, endTime int64, username string) (quotaDat
 	err = DB.Table("quota_data").Select("model_name, sum(count) as count, sum(quota) as quota, sum(token_used) as token_used, created_at").Where("created_at >= ? and created_at <= ?", startTime, endTime).Group("model_name, created_at").Find(&quotaDatas).Error
 	return quotaDatas, err
 }
+
+// QuotaStatResult 统计结果结构体（不按模型分组）
+type QuotaStatResult struct {
+	Timestamp int64 `json:"timestamp"` // 时间戳（按时间单位取整后的值）
+	TokenUsed int   `json:"token_used"`
+	Count     int   `json:"count"`
+	Quota     int   `json:"quota"`
+}
+
+// GetQuotaStats 获取按时间单位聚合的统计数据
+// timeUnit: hour, day, week, month
+// username: 可选，为空则统计所有用户
+func GetQuotaStats(startTime int64, endTime int64, username string, timeUnit string) (results []*QuotaStatResult, err error) {
+	var timeGroupExpr string
+
+	// 根据不同数据库和时间单位生成分组表达式
+	switch timeUnit {
+	case "day":
+		// 86400 秒 = 1 天
+		if common.UsingPostgreSQL {
+			timeGroupExpr = "(created_at / 86400) * 86400"
+		} else {
+			// MySQL 和 SQLite 都支持整数除法
+			timeGroupExpr = "(created_at DIV 86400) * 86400"
+		}
+	case "week":
+		// 604800 秒 = 1 周
+		if common.UsingPostgreSQL {
+			timeGroupExpr = "(created_at / 604800) * 604800"
+		} else {
+			timeGroupExpr = "(created_at DIV 604800) * 604800"
+		}
+	case "month":
+		// 月份需要使用日期函数，因为每月天数不同
+		if common.UsingPostgreSQL {
+			timeGroupExpr = "EXTRACT(EPOCH FROM DATE_TRUNC('month', TO_TIMESTAMP(created_at)))"
+		} else if common.UsingSQLite {
+			timeGroupExpr = "STRFTIME('%s', DATE(created_at, 'unixepoch', 'start of month'))"
+		} else {
+			// MySQL
+			timeGroupExpr = "UNIX_TIMESTAMP(DATE_FORMAT(FROM_UNIXTIME(created_at), '%Y-%m-01'))"
+		}
+	default:
+		// hour - 默认按小时，数据本身就是小时精度
+		timeGroupExpr = "created_at"
+	}
+
+	query := DB.Table("quota_data").
+		Select(fmt.Sprintf("%s as timestamp, SUM(token_used) as token_used, SUM(count) as count, SUM(quota) as quota", timeGroupExpr)).
+		Where("created_at >= ? AND created_at <= ?", startTime, endTime)
+
+	if username != "" {
+		query = query.Where("username = ?", username)
+	}
+
+	err = query.Group("timestamp").Order("timestamp ASC").Find(&results).Error
+	return results, err
+}
