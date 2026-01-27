@@ -1521,6 +1521,7 @@
     "按价格设置": "Set by price",
     "按倍率类型筛选": "Filter by ratio type",
     "按倍率设置": "Set by ratio",
+    "按模型分组": "Group by model",
     "按次": "Per request",
     "按次 {{symbol}}{{price}} * {{ratioType}} {{ratio}} = {{symbol}}{{total}}": "Per request {{symbol}}{{price}} * {{ratioType}} {{ratio}} = {{symbol}}{{total}}",
     "按次计费": "Pay per request",

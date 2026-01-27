@@ -26,9 +26,10 @@ var DisplayTokenStatEnabled = true
 var DrawingEnabled = true
 var TaskEnabled = true
 var DataExportEnabled = true
-var DataExportInterval = 5         // unit: minute
-var DataExportDefaultTime = "hour" // unit: minute
-var DefaultCollapseSidebar = false // default value of collapse sidebar
+var DataExportInterval = 5              // unit: minute
+var DataExportDefaultTime = "hour"      // unit: minute
+var DataExportTimezoneOffset = 8 * 3600 // 时区偏移，单位秒，默认 UTC+8（中国时区）
+var DefaultCollapseSidebar = false      // default value of collapse sidebar
 
 // Any options with "Secret", "Token" in its key won't be return by GetOptions
 

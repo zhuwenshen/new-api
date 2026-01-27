@@ -825,7 +825,21 @@ func HandleStreamFinalResponse(c *gin.Context, info *relaycommon.RelayInfo, clau
 	}
 
 	if info.RelayFormat == types.RelayFormatClaude {
-		//
+		// 如果上游没有发送 message_delta，需要补充发送，确保客户端能收到 usage 信息
+		if !claudeInfo.Done {
+			// 生成 message_delta 事件
+			messageDelta := dto.ClaudeResponse{
+				Type: "message_delta",
+				Usage: &dto.ClaudeUsage{
+					InputTokens:  claudeInfo.Usage.PromptTokens,
+					OutputTokens: claudeInfo.Usage.CompletionTokens,
+				},
+				Delta: &dto.ClaudeMediaMessage{
+					StopReason: common.GetPointer("end_turn"),
+				},
+			}
+			helper.ClaudeData(c, messageDelta)
+		}
 	} else if info.RelayFormat == types.RelayFormatOpenAI {
 		if info.ShouldIncludeUsage {
 			openAIUsage := buildOpenAIStyleUsageFromClaudeUsage(claudeInfo.Usage)
