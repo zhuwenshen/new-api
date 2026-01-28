@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import React, { useRef } from 'react';
-import { Modal, Form } from '@douyinfe/semi-ui';
+import { Modal, Form, Switch } from '@douyinfe/semi-ui';
 
 const SearchModal = ({
   searchModalVisible,
@@ -42,7 +42,7 @@ const SearchModal = ({
     <Component {...FORM_FIELD_PROPS} {...props} />
   );
 
-  const { start_timestamp, end_timestamp, username } = inputs;
+  const { start_timestamp, end_timestamp, username, group_by_model } = inputs;
 
   return (
     <Modal
@@ -85,6 +85,18 @@ const SearchModal = ({
           onChange: (value) =>
             handleInputChange(value, 'data_export_default_time'),
         })}
+
+        {isAdminUser && (
+          <div className='w-full mb-2'>
+            <label className='semi-form-field-label'>
+              <span className='semi-form-field-label-text'>{t('按模型分组')}</span>
+            </label>
+            <Switch
+              checked={group_by_model}
+              onChange={(value) => handleInputChange(value, 'group_by_model')}
+            />
+          </div>
+        )}
 
         {isAdminUser &&
           createFormField(Form.Input, {

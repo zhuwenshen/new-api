@@ -365,9 +365,13 @@ export const generateChartTimePoints = (
   data,
   dataExportDefaultTime,
 ) => {
+  // 直接使用 aggregatedData 中实际存在的时间点
   let chartTimePoints = Array.from(
     new Set([...aggregatedData.values()].map((d) => d.time)),
   );
+
+// 按时间排序
+  chartTimePoints.sort();
 
   if (chartTimePoints.length < DEFAULTS.MAX_TREND_POINTS) {
     const lastTime = Math.max(...data.map((item) => item.created_at));
