@@ -687,15 +687,26 @@ func HandleStreamFinalResponse(c *gin.Context, info *relaycommon.RelayInfo, clau
 			//上游出错
 		}
 		if claudeInfo.Usage.CompletionTokens == 0 || !claudeInfo.Done {
-			if common.DebugEnabled {
-				common.SysLog("claude response usage is not complete, maybe upstream error")
-			}
 			claudeInfo.Usage = service.ResponseText2Usage(c, claudeInfo.ResponseText.String(), info.UpstreamModelName, claudeInfo.Usage.PromptTokens)
 		}
 	}
 
 	if info.RelayFormat == types.RelayFormatClaude {
-		//
+		// 如果上游没有发送 message_delta，需要补充发送，确保客户端能收到 usage 信息
+		if !claudeInfo.Done {
+			// 生成 message_delta 事件
+			messageDelta := dto.ClaudeResponse{
+				Type: "message_delta",
+				Usage: &dto.ClaudeUsage{
+					InputTokens:  claudeInfo.Usage.PromptTokens,
+					OutputTokens: claudeInfo.Usage.CompletionTokens,
+				},
+				Delta: &dto.ClaudeMediaMessage{
+					StopReason: common.GetPointer("end_turn"),
+				},
+			}
+			helper.ClaudeData(c, messageDelta)
+		}
 	} else if info.RelayFormat == types.RelayFormatOpenAI {
 		if info.ShouldIncludeUsage {
 			response := helper.GenerateFinalUsageResponse(claudeInfo.ResponseId, claudeInfo.Created, info.UpstreamModelName, *claudeInfo.Usage)

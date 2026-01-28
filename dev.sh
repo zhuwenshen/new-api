@@ -5,8 +5,14 @@
 
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WEB_DIR="$PROJECT_DIR/web"
+LOG_DIR="$PROJECT_DIR/logs"
 BACKEND_PID_FILE="$PROJECT_DIR/.backend.pid"
 FRONTEND_PID_FILE="$PROJECT_DIR/.frontend.pid"
+BACKEND_LOG="$LOG_DIR/new-api-backend.log"
+FRONTEND_LOG="$LOG_DIR/new-api-frontend.log"
+
+# 环境变量(是否调试模式)
+export DEBUG=true
 
 # 颜色定义
 RED='\033[0;31m'
@@ -69,21 +75,22 @@ stop_frontend() {
 # 启动后端
 start_backend() {
     cd "$PROJECT_DIR"
+    mkdir -p "$LOG_DIR"
     log_info "编译后端..."
     if ! go build -o new-api .; then
         log_error "后端编译失败"
         return 1
     fi
     log_info "启动后端服务..."
-    nohup ./new-api > /tmp/new-api-backend.log 2>&1 &
+    nohup ./new-api > "$BACKEND_LOG" 2>&1 &
     echo $! > "$BACKEND_PID_FILE"
     sleep 2
     if kill -0 "$(cat "$BACKEND_PID_FILE")" 2>/dev/null; then
         log_info "后端服务已启动 (PID: $(cat "$BACKEND_PID_FILE"))"
         log_info "后端地址: http://localhost:3000/"
-        log_info "日志文件: /tmp/new-api-backend.log"
+        log_info "日志文件: $BACKEND_LOG"
     else
-        log_error "后端服务启动失败，请查看日志: /tmp/new-api-backend.log"
+        log_error "后端服务启动失败，请查看日志: $BACKEND_LOG"
         return 1
     fi
 }
@@ -91,16 +98,17 @@ start_backend() {
 # 启动前端
 start_frontend() {
     cd "$WEB_DIR"
+    mkdir -p "$LOG_DIR"
     log_info "启动前端开发服务器..."
-    nohup bun run dev > /tmp/new-api-frontend.log 2>&1 &
+    nohup bun run dev > "$FRONTEND_LOG" 2>&1 &
     echo $! > "$FRONTEND_PID_FILE"
     sleep 3
     if kill -0 "$(cat "$FRONTEND_PID_FILE")" 2>/dev/null; then
         log_info "前端服务已启动 (PID: $(cat "$FRONTEND_PID_FILE"))"
         log_info "前端地址: http://localhost:5173/"
-        log_info "日志文件: /tmp/new-api-frontend.log"
+        log_info "日志文件: $FRONTEND_LOG"
     else
-        log_error "前端服务启动失败，请查看日志: /tmp/new-api-frontend.log"
+        log_error "前端服务启动失败，请查看日志: $FRONTEND_LOG"
         return 1
     fi
 }
@@ -131,17 +139,17 @@ show_status() {
 show_logs() {
     case "$1" in
         backend|b)
-            tail -f /tmp/new-api-backend.log
+            tail -f "$BACKEND_LOG"
             ;;
         frontend|f)
-            tail -f /tmp/new-api-frontend.log
+            tail -f "$FRONTEND_LOG"
             ;;
         *)
             log_info "后端日志:"
-            tail -20 /tmp/new-api-backend.log 2>/dev/null || echo "无日志"
+            tail -20 "$BACKEND_LOG" 2>/dev/null || echo "无日志"
             echo ""
             log_info "前端日志:"
-            tail -20 /tmp/new-api-frontend.log 2>/dev/null || echo "无日志"
+            tail -20 "$FRONTEND_LOG" 2>/dev/null || echo "无日志"
             ;;
     esac
 }
