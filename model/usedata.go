@@ -115,24 +115,111 @@ func GetQuotaDataByUserId(userId int, startTime int64, endTime int64) (quotaData
 	return quotaDatas, err
 }
 
-func GetAllQuotaDates(startTime int64, endTime int64, username string) (quotaData []*QuotaData, err error) {
-	if username != "" {
-		return GetQuotaDataByUsername(username, startTime, endTime)
+// GetQuotaDataByUserIdWithTimeUnit 根据用户ID和时间单位获取聚合数据
+func GetQuotaDataByUserIdWithTimeUnit(userId int, startTime int64, endTime int64, timeUnit string) (quotaData []*QuotaData, err error) {
+	var timeGroupExpr string
+	tzOffset := common.DataExportTimezoneOffset
+	// 周一偏移：1970-01-01 是周四，需要加 3 天（259200 秒）让周从周一开始
+	const mondayOffset = 3 * 86400
+
+	// 根据不同数据库和时间单位生成分组表达式
+	// 时区处理：先加上时区偏移，计算后再减去，得到本地时区的日期边界对应的 UTC 时间戳
+	switch timeUnit {
+	case "day":
+		if common.UsingMySQL {
+			timeGroupExpr = fmt.Sprintf("((created_at + %d) DIV 86400) * 86400 - %d", tzOffset, tzOffset)
+		} else {
+			// PostgreSQL 和 SQLite 都使用 / 进行整数除法
+			timeGroupExpr = fmt.Sprintf("((created_at + %d) / 86400) * 86400 - %d", tzOffset, tzOffset)
+		}
+	case "week":
+		// 周从周一开始：加上周一偏移后计算，再减去偏移
+		if common.UsingMySQL {
+			timeGroupExpr = fmt.Sprintf("((created_at + %d + %d) DIV 604800) * 604800 - %d - %d", tzOffset, mondayOffset, mondayOffset, tzOffset)
+		} else {
+			timeGroupExpr = fmt.Sprintf("((created_at + %d + %d) / 604800) * 604800 - %d - %d", tzOffset, mondayOffset, mondayOffset, tzOffset)
+		}
+	case "month":
+		if common.UsingPostgreSQL {
+			timeGroupExpr = fmt.Sprintf("EXTRACT(EPOCH FROM DATE_TRUNC('month', TO_TIMESTAMP(created_at + %d))) - %d", tzOffset, tzOffset)
+		} else if common.UsingSQLite {
+			timeGroupExpr = fmt.Sprintf("CAST(STRFTIME('%%s', DATE(created_at + %d, 'unixepoch', 'start of month')) AS INTEGER) - %d", tzOffset, tzOffset)
+		} else {
+			timeGroupExpr = fmt.Sprintf("UNIX_TIMESTAMP(DATE_FORMAT(FROM_UNIXTIME(created_at + %d), '%%Y-%%m-01')) - %d", tzOffset, tzOffset)
+		}
+	default:
+		// hour - 默认按小时，直接返回原始数据
+		var quotaDatas []*QuotaData
+		err = DB.Table("quota_data").Where("user_id = ? and created_at >= ? and created_at <= ?", userId, startTime, endTime).Find(&quotaDatas).Error
+		return quotaDatas, err
 	}
+
 	var quotaDatas []*QuotaData
-	// 从quota_data表中查询数据
-	// only select model_name, sum(count) as count, sum(quota) as quota, model_name, created_at from quota_data group by model_name, created_at;
-	//err = DB.Table("quota_data").Where("created_at >= ? and created_at <= ?", startTime, endTime).Find(&quotaDatas).Error
-	err = DB.Table("quota_data").Select("model_name, sum(count) as count, sum(quota) as quota, sum(token_used) as token_used, created_at").Where("created_at >= ? and created_at <= ?", startTime, endTime).Group("model_name, created_at").Find(&quotaDatas).Error
+	err = DB.Table("quota_data").
+		Select(fmt.Sprintf("model_name, SUM(count) as count, SUM(quota) as quota, SUM(token_used) as token_used, %s as created_at", timeGroupExpr)).
+		Where("user_id = ? AND created_at >= ? AND created_at <= ?", userId, startTime, endTime).
+		Group(fmt.Sprintf("model_name, %s", timeGroupExpr)).
+		Order("created_at ASC").
+		Find(&quotaDatas).Error
+	return quotaDatas, err
+}
+
+func GetAllQuotaDates(startTime int64, endTime int64, username string, timeUnit string) (quotaData []*QuotaData, err error) {
+	var timeGroupExpr string
+	tzOffset := common.DataExportTimezoneOffset
+	// 周一偏移：1970-01-01 是周四，需要加 3 天（259200 秒）让周从周一开始
+	const mondayOffset = 3 * 86400
+
+	// 根据不同数据库和时间单位生成分组表达式
+	// 时区处理：先加上时区偏移，计算后再减去，得到本地时区的日期边界对应的 UTC 时间戳
+	switch timeUnit {
+	case "day":
+		if common.UsingMySQL {
+			timeGroupExpr = fmt.Sprintf("((created_at + %d) DIV 86400) * 86400 - %d", tzOffset, tzOffset)
+		} else {
+			// PostgreSQL 和 SQLite 都使用 / 进行整数除法
+			timeGroupExpr = fmt.Sprintf("((created_at + %d) / 86400) * 86400 - %d", tzOffset, tzOffset)
+		}
+	case "week":
+		// 周从周一开始：加上周一偏移后计算，再减去偏移
+		if common.UsingMySQL {
+			timeGroupExpr = fmt.Sprintf("((created_at + %d + %d) DIV 604800) * 604800 - %d - %d", tzOffset, mondayOffset, mondayOffset, tzOffset)
+		} else {
+			timeGroupExpr = fmt.Sprintf("((created_at + %d + %d) / 604800) * 604800 - %d - %d", tzOffset, mondayOffset, mondayOffset, tzOffset)
+		}
+	case "month":
+		if common.UsingPostgreSQL {
+			timeGroupExpr = fmt.Sprintf("EXTRACT(EPOCH FROM DATE_TRUNC('month', TO_TIMESTAMP(created_at + %d))) - %d", tzOffset, tzOffset)
+		} else if common.UsingSQLite {
+			timeGroupExpr = fmt.Sprintf("CAST(STRFTIME('%%s', DATE(created_at + %d, 'unixepoch', 'start of month')) AS INTEGER) - %d", tzOffset, tzOffset)
+		} else {
+			timeGroupExpr = fmt.Sprintf("UNIX_TIMESTAMP(DATE_FORMAT(FROM_UNIXTIME(created_at + %d), '%%Y-%%m-01')) - %d", tzOffset, tzOffset)
+		}
+	default:
+		// hour - 默认按小时
+		timeGroupExpr = "created_at"
+	}
+
+	var quotaDatas []*QuotaData
+	query := DB.Table("quota_data").
+		Select(fmt.Sprintf("model_name, SUM(count) as count, SUM(quota) as quota, SUM(token_used) as token_used, %s as created_at", timeGroupExpr)).
+		Where("created_at >= ? AND created_at <= ?", startTime, endTime)
+
+	if username != "" {
+		query = query.Where("username = ?", username)
+	}
+
+	err = query.Group(fmt.Sprintf("model_name, %s", timeGroupExpr)).Order("created_at ASC").Find(&quotaDatas).Error
 	return quotaDatas, err
 }
 
 // QuotaStatResult 统计结果结构体（不按模型分组）
 type QuotaStatResult struct {
-	Timestamp int64 `json:"timestamp"` // 时间戳（按时间单位取整后的值）
-	TokenUsed int   `json:"token_used"`
-	Count     int   `json:"count"`
-	Quota     int   `json:"quota"`
+	CreatedAt int64  `json:"created_at"` // 时间戳（按时间单位取整后的值）
+	ModelName string `json:"model_name"` // 模型名称，统一为 "all"
+	TokenUsed int    `json:"token_used"`
+	Count     int    `json:"count"`
+	Quota     int    `json:"quota"`
 }
 
 // GetQuotaStats 获取按时间单位聚合的统计数据
@@ -140,33 +227,37 @@ type QuotaStatResult struct {
 // username: 可选，为空则统计所有用户
 func GetQuotaStats(startTime int64, endTime int64, username string, timeUnit string) (results []*QuotaStatResult, err error) {
 	var timeGroupExpr string
+	tzOffset := common.DataExportTimezoneOffset
+	// 周一偏移：1970-01-01 是周四，需要加 3 天（259200 秒）让周从周一开始
+	const mondayOffset = 3 * 86400
 
 	// 根据不同数据库和时间单位生成分组表达式
+	// 时区处理：先加上时区偏移，计算后再减去，得到本地时区的日期边界对应的 UTC 时间戳
 	switch timeUnit {
 	case "day":
 		// 86400 秒 = 1 天
-		if common.UsingPostgreSQL {
-			timeGroupExpr = "(created_at / 86400) * 86400"
+		if common.UsingMySQL {
+			timeGroupExpr = fmt.Sprintf("((created_at + %d) DIV 86400) * 86400 - %d", tzOffset, tzOffset)
 		} else {
-			// MySQL 和 SQLite 都支持整数除法
-			timeGroupExpr = "(created_at DIV 86400) * 86400"
+			// PostgreSQL 和 SQLite 都使用 / 进行整数除法
+			timeGroupExpr = fmt.Sprintf("((created_at + %d) / 86400) * 86400 - %d", tzOffset, tzOffset)
 		}
 	case "week":
-		// 604800 秒 = 1 周
-		if common.UsingPostgreSQL {
-			timeGroupExpr = "(created_at / 604800) * 604800"
+		// 604800 秒 = 1 周，周从周一开始
+		if common.UsingMySQL {
+			timeGroupExpr = fmt.Sprintf("((created_at + %d + %d) DIV 604800) * 604800 - %d - %d", tzOffset, mondayOffset, mondayOffset, tzOffset)
 		} else {
-			timeGroupExpr = "(created_at DIV 604800) * 604800"
+			timeGroupExpr = fmt.Sprintf("((created_at + %d + %d) / 604800) * 604800 - %d - %d", tzOffset, mondayOffset, mondayOffset, tzOffset)
 		}
 	case "month":
 		// 月份需要使用日期函数，因为每月天数不同
 		if common.UsingPostgreSQL {
-			timeGroupExpr = "EXTRACT(EPOCH FROM DATE_TRUNC('month', TO_TIMESTAMP(created_at)))"
+			timeGroupExpr = fmt.Sprintf("EXTRACT(EPOCH FROM DATE_TRUNC('month', TO_TIMESTAMP(created_at + %d))) - %d", tzOffset, tzOffset)
 		} else if common.UsingSQLite {
-			timeGroupExpr = "STRFTIME('%s', DATE(created_at, 'unixepoch', 'start of month'))"
+			timeGroupExpr = fmt.Sprintf("CAST(STRFTIME('%%s', DATE(created_at + %d, 'unixepoch', 'start of month')) AS INTEGER) - %d", tzOffset, tzOffset)
 		} else {
 			// MySQL
-			timeGroupExpr = "UNIX_TIMESTAMP(DATE_FORMAT(FROM_UNIXTIME(created_at), '%Y-%m-01'))"
+			timeGroupExpr = fmt.Sprintf("UNIX_TIMESTAMP(DATE_FORMAT(FROM_UNIXTIME(created_at + %d), '%%Y-%%m-01')) - %d", tzOffset, tzOffset)
 		}
 	default:
 		// hour - 默认按小时，数据本身就是小时精度
@@ -174,13 +265,13 @@ func GetQuotaStats(startTime int64, endTime int64, username string, timeUnit str
 	}
 
 	query := DB.Table("quota_data").
-		Select(fmt.Sprintf("%s as timestamp, SUM(token_used) as token_used, SUM(count) as count, SUM(quota) as quota", timeGroupExpr)).
+		Select(fmt.Sprintf("%s as created_at, 'all' as model_name, SUM(token_used) as token_used, SUM(count) as count, SUM(quota) as quota", timeGroupExpr)).
 		Where("created_at >= ? AND created_at <= ?", startTime, endTime)
 
 	if username != "" {
 		query = query.Where("username = ?", username)
 	}
 
-	err = query.Group("timestamp").Order("timestamp ASC").Find(&results).Error
+	err = query.Group(timeGroupExpr).Order("created_at ASC").Find(&results).Error
 	return results, err
 }

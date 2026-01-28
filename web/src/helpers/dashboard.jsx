@@ -357,25 +357,13 @@ export const generateChartTimePoints = (
   data,
   dataExportDefaultTime,
 ) => {
+  // 直接使用 aggregatedData 中实际存在的时间点
   let chartTimePoints = Array.from(
     new Set([...aggregatedData.values()].map((d) => d.time)),
   );
 
-  if (chartTimePoints.length < DEFAULTS.MAX_TREND_POINTS) {
-    const lastTime = Math.max(...data.map((item) => item.created_at));
-    const interval = getTimeInterval(dataExportDefaultTime, true);
-
-    // 生成时间点数组，用于检查是否跨年
-    const generatedTimestamps = Array.from(
-      { length: DEFAULTS.MAX_TREND_POINTS },
-      (_, i) => lastTime - (6 - i) * interval,
-    );
-    const showYear = isDataCrossYear(generatedTimestamps);
-
-    chartTimePoints = generatedTimestamps.map(ts =>
-      timestamp2string1(ts, dataExportDefaultTime, showYear),
-    );
-  }
+  // 按时间排序
+  chartTimePoints.sort();
 
   return chartTimePoints;
 };

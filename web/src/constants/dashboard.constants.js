@@ -41,12 +41,14 @@ export const TIME_OPTIONS = [
   { label: '小时', value: 'hour' },
   { label: '天', value: 'day' },
   { label: '周', value: 'week' },
+  { label: '月', value: 'month' },
 ];
 
 export const DEFAULT_TIME_INTERVALS = {
   hour: { seconds: 3600, minutes: 60 },
   day: { seconds: 86400, minutes: 1440 },
   week: { seconds: 604800, minutes: 10080 },
+  month: { seconds: 2592000, minutes: 43200 }, // 按 30 天计算
 };
 
 // ========== 默认时间设置 ==========

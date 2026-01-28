@@ -232,6 +232,12 @@ export function timestamp2string1(timestamp, dataExportDefaultTime = 'hour', sho
   if (hour.length === 1) {
     hour = '0' + hour;
   }
+
+  // 按月显示：只显示年-月
+  if (dataExportDefaultTime === 'month') {
+    return year + '-' + month;
+  }
+
   // 仅在跨年时显示年份
   let str = showYear ? year + '-' + month + '-' + day : month + '-' + day;
   if (dataExportDefaultTime === 'hour') {

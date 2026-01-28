@@ -1107,6 +1107,7 @@
     "按价格设置": "Set by price",
     "按倍率类型筛选": "Filter by ratio type",
     "按倍率设置": "Set by ratio",
+    "按模型分组": "Group by model",
     "按次计费": "Pay per view",
     "按照如下格式输入：AccessKey|SecretAccessKey|Region": "Enter in the format: AccessKey|SecretAccessKey|Region",
     "按量计费": "Pay as you go",
