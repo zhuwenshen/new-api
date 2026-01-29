@@ -10,8 +10,6 @@ RUN DISABLE_ESLINT_PLUGIN='true' VITE_REACT_APP_VERSION=$(cat VERSION) bun run b
 
 FROM docker.1ms.run/golang:alpine AS builder2
 ENV GO111MODULE=on CGO_ENABLED=0
-ENV HTTP_PROXY="http://pac.router.easyops.local:8118"
-ENV HTTPS_PROXY="http://pac.router.easyops.local:8118"
 
 ARG TARGETOS
 ARG TARGETARCH
