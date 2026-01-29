@@ -1,12 +1,12 @@
-FROM docker.1ms.run/oven/bun:latest AS builder
+FROM docker.1ms.run/node:20-alpine AS builder
 
 WORKDIR /build
 COPY web/package.json .
 COPY web/bun.lock .
-RUN BUN_CONFIG_NO_VERIFY=1 bun install --registry=https://registry.npmmirror.com
+RUN npm config set registry https://registry.npmmirror.com && npm install
 COPY ./web .
 COPY ./VERSION .
-RUN DISABLE_ESLINT_PLUGIN='true' VITE_REACT_APP_VERSION=$(cat VERSION) bun run build
+RUN DISABLE_ESLINT_PLUGIN='true' VITE_REACT_APP_VERSION=$(cat VERSION) npx vite build
 
 FROM docker.1ms.run/golang:alpine AS builder2
 ENV GO111MODULE=on CGO_ENABLED=0
