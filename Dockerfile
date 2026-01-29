@@ -2,6 +2,7 @@ FROM docker.1ms.run/oven/bun:latest AS builder
 
 WORKDIR /build
 COPY web/package.json .
+COPY web/bun.lock .
 RUN BUN_CONFIG_NO_VERIFY=1 bun install --registry=https://registry.npmmirror.com
 COPY ./web .
 COPY ./VERSION .
