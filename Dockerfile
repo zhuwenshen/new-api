@@ -5,7 +5,7 @@ ENV HTTPS_PROXY="http://pac.router.easyops.local:8118"
 WORKDIR /build
 COPY web/package.json .
 COPY web/bun.lock .
-RUN bun install
+RUN rm -rf ~/.bun/install/cache && bun install
 COPY ./web .
 COPY ./VERSION .
 RUN DISABLE_ESLINT_PLUGIN='true' VITE_REACT_APP_VERSION=$(cat VERSION) bun run build
