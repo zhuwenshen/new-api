@@ -2,7 +2,7 @@ FROM docker.1ms.run/oven/bun:latest AS builder
 
 WORKDIR /build
 COPY web/package.json .
-RUN echo '[install]\nregistry = "https://registry.npmmirror.com"' > ~/.bunfig.toml && bun install
+RUN BUN_CONFIG_NO_VERIFY=1 bun install --registry=https://registry.npmmirror.com
 COPY ./web .
 COPY ./VERSION .
 RUN DISABLE_ESLINT_PLUGIN='true' VITE_REACT_APP_VERSION=$(cat VERSION) bun run build
