@@ -3,7 +3,7 @@ FROM docker.1ms.run/oven/bun:latest AS builder
 WORKDIR /build
 COPY web/package.json .
 COPY web/bun.lock .
-RUN bun install --no-verify --registry=https://registry.npmmirror.com
+RUN bun pm cache rm && bun install --no-verify --registry=https://registry.npmmirror.com
 COPY ./web .
 COPY ./VERSION .
 RUN DISABLE_ESLINT_PLUGIN='true' VITE_REACT_APP_VERSION=$(cat VERSION) bun run build
