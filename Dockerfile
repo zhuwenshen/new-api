@@ -10,6 +10,7 @@ RUN DISABLE_ESLINT_PLUGIN='true' VITE_REACT_APP_VERSION=$(cat VERSION) bun run b
 
 FROM docker.1ms.run/golang:alpine AS builder2
 ENV GO111MODULE=on CGO_ENABLED=0
+ENV GOPROXY=https://goproxy.cn,direct
 
 ARG TARGETOS
 ARG TARGETARCH
