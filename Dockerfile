@@ -1,4 +1,4 @@
-FROM oven/bun:latest AS builder
+FROM docker.1ms.run/oven/bun:latest AS builder
 
 WORKDIR /build
 COPY web/package.json .
@@ -8,7 +8,7 @@ COPY ./web .
 COPY ./VERSION .
 RUN DISABLE_ESLINT_PLUGIN='true' VITE_REACT_APP_VERSION=$(cat VERSION) bun run build
 
-FROM golang:alpine AS builder2
+FROM docker.1ms.run/golang:alpine AS builder2
 ENV GO111MODULE=on CGO_ENABLED=0
 
 ARG TARGETOS
@@ -25,7 +25,7 @@ COPY . .
 COPY --from=builder /build/dist ./web/dist
 RUN go build -ldflags "-s -w -X 'github.com/QuantumNous/new-api/common.Version=$(cat VERSION)'" -o new-api
 
-FROM debian:bookworm-slim
+FROM docker.1ms.run/debian:bookworm-slim
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates tzdata libasan8 wget \
