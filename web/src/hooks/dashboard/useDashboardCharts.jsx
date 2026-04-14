@@ -410,6 +410,7 @@ export const useDashboardCharts = (
         totalTokens,
         uniqueModels,
         timePoints,
+        timePointTimestampMap,
         timeQuotaMap,
         timeTokensMap,
         timeCountMap,
@@ -421,6 +422,7 @@ export const useDashboardCharts = (
         timeTokensMap,
         timeCountMap,
         dataExportDefaultTime,
+        timePointTimestampMap,
       );
       setTrendData(trendDataResult);
 

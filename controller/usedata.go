@@ -82,21 +82,21 @@ func GetUserQuotaDates(c *gin.Context) {
 	endTimestamp, _ := strconv.ParseInt(c.Query("end_timestamp"), 10, 64)
 	timeUnit := c.DefaultQuery("default_time", "hour")
 
-	// 判断时间跨度是否超过 1 个月
-	if endTimestamp-startTimestamp > 2592000 {
-		c.JSON(http.StatusOK, gin.H{
-			"success": false,
-			"message": "时间跨度不能超过 1 个月",
-		})
-		return
-	}
-
 	// 验证 time_unit 参数
 	validTimeUnits := map[string]bool{"hour": true, "day": true, "week": true, "month": true}
 	if !validTimeUnits[timeUnit] {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
 			"message": "无效的 time_unit 参数，可选值：hour、day、week、month",
+		})
+		return
+	}
+
+	// 小时粒度会返回原始小时数据，保留 1 个月限制；聚合粒度允许更长时间范围
+	if timeUnit == "hour" && endTimestamp-startTimestamp > 2592000 {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "按小时统计的时间跨度不能超过 1 个月",
 		})
 		return
 	}

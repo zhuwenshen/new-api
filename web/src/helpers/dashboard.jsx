@@ -42,10 +42,49 @@ export const getDefaultTime = () => {
   return localStorage.getItem(STORAGE_KEYS.DATA_EXPORT_DEFAULT_TIME) || 'hour';
 };
 
-export const getTimeInterval = (timeType, isSeconds = false) => {
+const getMonthInterval = (timestamp, isSeconds = false) => {
+  const date = new Date(timestamp * 1000);
+  const daysInMonth = new Date(
+    date.getFullYear(),
+    date.getMonth() + 1,
+    0,
+  ).getDate();
+  return isSeconds ? daysInMonth * 86400 : daysInMonth * 1440;
+};
+
+export const getTimeInterval = (
+  timeType,
+  isSeconds = false,
+  referenceTimestamp = null,
+) => {
+  if (timeType === 'month' && typeof referenceTimestamp === 'number') {
+    return getMonthInterval(referenceTimestamp, isSeconds);
+  }
+
   const intervals =
     DEFAULT_TIME_INTERVALS[timeType] || DEFAULT_TIME_INTERVALS.hour;
   return isSeconds ? intervals.seconds : intervals.minutes;
+};
+
+export const shiftTimestampByUnit = (timestamp, timeType, step) => {
+  const date = new Date(timestamp * 1000);
+
+  switch (timeType) {
+    case 'day':
+      date.setDate(date.getDate() + step);
+      break;
+    case 'week':
+      date.setDate(date.getDate() + step * 7);
+      break;
+    case 'month':
+      date.setMonth(date.getMonth() + step);
+      break;
+    default:
+      date.setHours(date.getHours() + step);
+      break;
+  }
+
+  return Math.floor(date.getTime() / 1000);
 };
 
 export const getInitialTimestamp = () => {
@@ -255,6 +294,7 @@ export const processRawData = (
     totalTokens: 0,
     uniqueModels: new Set(),
     timePoints: [],
+    timePointTimestampMap: new Map(),
     timeQuotaMap: new Map(),
     timeTokensMap: new Map(),
     timeCountMap: new Map(),
@@ -276,6 +316,7 @@ export const processRawData = (
     );
     if (!result.timePoints.includes(timeKey)) {
       result.timePoints.push(timeKey);
+      result.timePointTimestampMap.set(timeKey, item.created_at);
     }
 
     initializeMaps(
@@ -289,7 +330,11 @@ export const processRawData = (
     updateMapValue(result.timeCountMap, timeKey, item.count);
   });
 
-  result.timePoints.sort();
+  result.timePoints.sort(
+    (a, b) =>
+      result.timePointTimestampMap.get(a) -
+      result.timePointTimestampMap.get(b),
+  );
   return result;
 };
 
@@ -299,6 +344,7 @@ export const calculateTrendData = (
   timeTokensMap,
   timeCountMap,
   dataExportDefaultTime,
+  timePointTimestampMap,
 ) => {
   const quotaTrend = timePoints.map((time) => timeQuotaMap.get(time) || 0);
   const tokensTrend = timePoints.map((time) => timeTokensMap.get(time) || 0);
@@ -308,9 +354,12 @@ export const calculateTrendData = (
   const tpmTrend = [];
 
   if (timePoints.length >= 2) {
-    const interval = getTimeInterval(dataExportDefaultTime);
-
     for (let i = 0; i < timePoints.length; i++) {
+      const interval = getTimeInterval(
+        dataExportDefaultTime,
+        false,
+        timePointTimestampMap?.get(timePoints[i]),
+      );
       rpmTrend.push(timeCountMap.get(timePoints[i]) / interval);
       tpmTrend.push(timeTokensMap.get(timePoints[i]) / interval);
     }
@@ -346,6 +395,7 @@ export const aggregateDataByTimeAndModel = (data, dataExportDefaultTime) => {
     if (!aggregatedData.has(key)) {
       aggregatedData.set(key, {
         time: timeKey,
+        timestamp: item.created_at,
         model: modelKey,
         quota: 0,
         count: 0,
@@ -365,22 +415,29 @@ export const generateChartTimePoints = (
   data,
   dataExportDefaultTime,
 ) => {
-  // 直接使用 aggregatedData 中实际存在的时间点
-  let chartTimePoints = Array.from(
-    new Set([...aggregatedData.values()].map((d) => d.time)),
-  );
+  const existingTimePoints = new Map();
+  for (const item of aggregatedData.values()) {
+    if (!existingTimePoints.has(item.time)) {
+      existingTimePoints.set(item.time, item.timestamp);
+    }
+  }
 
-// 按时间排序
-  chartTimePoints.sort();
+  let chartTimePoints = Array.from(existingTimePoints.entries())
+    .sort((a, b) => a[1] - b[1])
+    .map(([time]) => time);
 
-  if (chartTimePoints.length < DEFAULTS.MAX_TREND_POINTS) {
+  if (data.length > 0 && chartTimePoints.length < DEFAULTS.MAX_TREND_POINTS) {
     const lastTime = Math.max(...data.map((item) => item.created_at));
-    const interval = getTimeInterval(dataExportDefaultTime, true);
 
     // 生成时间点数组，用于检查是否跨年
     const generatedTimestamps = Array.from(
       { length: DEFAULTS.MAX_TREND_POINTS },
-      (_, i) => lastTime - (6 - i) * interval,
+      (_, i) =>
+        shiftTimestampByUnit(
+          lastTime,
+          dataExportDefaultTime,
+          i - (DEFAULTS.MAX_TREND_POINTS - 1),
+        ),
     );
     const showYear = isDataCrossYear(generatedTimestamps);
 

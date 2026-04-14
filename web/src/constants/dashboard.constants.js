@@ -48,7 +48,7 @@ export const DEFAULT_TIME_INTERVALS = {
   hour: { seconds: 3600, minutes: 60 },
   day: { seconds: 86400, minutes: 1440 },
   week: { seconds: 604800, minutes: 10080 },
-  month: { seconds: 2592000, minutes: 43200 }, // 按 30 天计算
+  month: { seconds: 2592000, minutes: 43200 }, // 仅作兜底，实际月粒度按自然月计算
 };
 
 // ========== 默认时间设置 ==========
